@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 type Action = "summary" | "theses" | "post";
-type LoadingType = "parse" | Action;
+type LoadingType = "parse" | "translate" | Action;
 
 const ACTION_LABELS: Record<Action, string> = {
   summary: "О чём статья",
@@ -14,6 +14,7 @@ const ACTION_LABELS: Record<Action, string> = {
 export function ArticleForm() {
   const [url, setUrl] = useState("");
   const [result, setResult] = useState("");
+  const [isJsonResult, setIsJsonResult] = useState(false);
   const [loadingType, setLoadingType] = useState<LoadingType | null>(null);
   const [error, setError] = useState("");
 
@@ -44,6 +45,7 @@ export function ArticleForm() {
 
     setLoadingType("parse");
     setResult("");
+    setIsJsonResult(false);
 
     try {
       const response = await fetch("/api/parse", {
@@ -60,7 +62,46 @@ export function ArticleForm() {
         return;
       }
 
+      if (!data.content) {
+        setError(
+          "Текст статьи не найден. Попробуйте другой URL или сначала проверьте парсинг.",
+        );
+      }
+
       setResult(JSON.stringify(data, null, 2));
+      setIsJsonResult(true);
+    } catch {
+      setError("Не удалось выполнить запрос к серверу");
+      setResult("");
+    } finally {
+      setLoadingType(null);
+    }
+  }
+
+  async function handleTranslate() {
+    const trimmedUrl = validateUrl();
+    if (!trimmedUrl) return;
+
+    setLoadingType("translate");
+    setResult("");
+    setIsJsonResult(false);
+
+    try {
+      const response = await fetch("/api/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: trimmedUrl }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error ?? "Ошибка при переводе статьи");
+        setResult("");
+        return;
+      }
+
+      setResult(data.translation ?? "");
     } catch {
       setError("Не удалось выполнить запрос к серверу");
       setResult("");
@@ -75,6 +116,7 @@ export function ArticleForm() {
 
     setLoadingType(action);
     setResult("");
+    setIsJsonResult(false);
 
     // Заглушка до подключения AI
     await new Promise((resolve) => setTimeout(resolve, 500));
@@ -112,14 +154,24 @@ export function ArticleForm() {
         />
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
 
-        <button
-          type="button"
-          onClick={handleParse}
-          disabled={isLoading}
-          className="mt-4 rounded-lg bg-slate-800 px-5 py-2.5 font-medium text-white transition hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          Парсинг
-        </button>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <button
+            type="button"
+            onClick={handleParse}
+            disabled={isLoading}
+            className="rounded-lg bg-slate-800 px-5 py-2.5 font-medium text-white transition hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Парсинг
+          </button>
+          <button
+            type="button"
+            onClick={handleTranslate}
+            disabled={isLoading}
+            className="rounded-lg bg-blue-600 px-5 py-2.5 font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Перевод
+          </button>
+        </div>
 
         <div className="mt-6 border-t border-slate-200 pt-6">
           <p className="mb-3 text-sm font-medium text-slate-700">Действия AI</p>
@@ -159,15 +211,21 @@ export function ArticleForm() {
             <p className="animate-pulse text-slate-500">
               {loadingType === "parse"
                 ? "Парсинг статьи…"
-                : `Генерация «${ACTION_LABELS[loadingType as Action]}»…`}
+                : loadingType === "translate"
+                  ? "Перевод статьи…"
+                  : `Генерация «${ACTION_LABELS[loadingType as Action]}»…`}
             </p>
           ) : result ? (
-            <pre className="overflow-x-auto whitespace-pre-wrap font-mono text-sm">
-              {result}
-            </pre>
+            isJsonResult ? (
+              <pre className="overflow-x-auto whitespace-pre-wrap font-mono text-sm">
+                {result}
+              </pre>
+            ) : (
+              <p className="whitespace-pre-wrap">{result}</p>
+            )
           ) : (
             <p className="text-slate-400">
-              Нажмите «Парсинг» или выберите действие AI
+              Нажмите «Парсинг», «Перевод» или выберите действие AI
             </p>
           )}
         </div>

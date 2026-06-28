@@ -20,6 +20,7 @@ const CONTENT_SELECTORS = [
   ".post",
   ".content",
   "main",
+  "body",
 ];
 
 const DATE_SELECTORS = [
@@ -99,14 +100,23 @@ function extractContent($: cheerio.CheerioAPI): string | null {
 }
 
 export async function parseArticle(url: string): Promise<ParsedArticle> {
-  const response = await fetch(url, {
-    headers: {
-      "User-Agent":
-        "Mozilla/5.0 (compatible; LexionBot/1.0; +https://github.com/lexion)",
-      Accept: "text/html,application/xhtml+xml",
-    },
-    signal: AbortSignal.timeout(15000),
-  });
+  let response: Response;
+
+  try {
+    response = await fetch(url, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        Accept: "text/html,application/xhtml+xml",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
+      signal: AbortSignal.timeout(15000),
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Неизвестная ошибка сети";
+    throw new Error(`Не удалось загрузить страницу: ${message}`);
+  }
 
   if (!response.ok) {
     throw new Error(`Не удалось загрузить страницу: HTTP ${response.status}`);
