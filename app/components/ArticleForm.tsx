@@ -1,14 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import type { ArticleAction } from "@/lib/article-ai";
 
-type Action = "summary" | "theses" | "post";
-type LoadingType = "parse" | "translate" | Action;
+type LoadingType = "parse" | "translate" | ArticleAction;
 
-const ACTION_LABELS: Record<Action, string> = {
+const ACTION_LABELS: Record<ArticleAction, string> = {
   summary: "О чём статья",
   theses: "Тезисы",
-  post: "Пост",
+  "telegram-post": "Пост для Telegram",
 };
 
 export function ArticleForm() {
@@ -110,7 +110,7 @@ export function ArticleForm() {
     }
   }
 
-  async function handleAction(action: Action) {
+  async function handleAction(action: ArticleAction) {
     const trimmedUrl = validateUrl();
     if (!trimmedUrl) return;
 
@@ -118,13 +118,28 @@ export function ArticleForm() {
     setResult("");
     setIsJsonResult(false);
 
-    // Заглушка до подключения AI
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    try {
+      const response = await fetch("/api/ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: trimmedUrl, action }),
+      });
 
-    setResult(
-      `Здесь появится результат для действия «${ACTION_LABELS[action]}» по статье:\n${trimmedUrl}`,
-    );
-    setLoadingType(null);
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error ?? "Ошибка при генерации ответа");
+        setResult("");
+        return;
+      }
+
+      setResult(data.result ?? "");
+    } catch {
+      setError("Не удалось выполнить запрос к серверу");
+      setResult("");
+    } finally {
+      setLoadingType(null);
+    }
   }
 
   const isLoading = loadingType !== null;
@@ -194,11 +209,11 @@ export function ArticleForm() {
             </button>
             <button
               type="button"
-              onClick={() => handleAction("post")}
+              onClick={() => handleAction("telegram-post")}
               disabled={isLoading}
               className="rounded-lg bg-green-600 px-5 py-2.5 font-medium text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Пост
+              Пост для Telegram
             </button>
           </div>
         </div>
@@ -213,7 +228,7 @@ export function ArticleForm() {
                 ? "Парсинг статьи…"
                 : loadingType === "translate"
                   ? "Перевод статьи…"
-                  : `Генерация «${ACTION_LABELS[loadingType as Action]}»…`}
+                  : `Генерация «${ACTION_LABELS[loadingType as ArticleAction]}»…`}
             </p>
           ) : result ? (
             isJsonResult ? (

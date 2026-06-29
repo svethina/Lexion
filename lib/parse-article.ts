@@ -119,6 +119,12 @@ export async function parseArticle(url: string): Promise<ParsedArticle> {
   }
 
   if (!response.ok) {
+    if (response.status === 403) {
+      throw new Error(
+        "Сайт заблокировал загрузку (HTTP 403). Такие ресурсы не отдают текст ботам — попробуйте другую статью или другой источник.",
+      );
+    }
+
     throw new Error(`Не удалось загрузить страницу: HTTP ${response.status}`);
   }
 

@@ -17,6 +17,28 @@ interface OpenRouterResponse {
   };
 }
 
+function getSiteUrl(): string {
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+
+  return process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+}
+
+function getApiKey(): string {
+  const apiKey = process.env.OPENROUTER_API_KEY?.trim();
+
+  if (!apiKey) {
+    const hint = process.env.VERCEL
+      ? "На Vercel: Settings → Environment Variables → добавьте OPENROUTER_API_KEY → Redeploy."
+      : "Локально: создайте .env.local в корне проекта и перезапустите pnpm dev.";
+
+    throw new Error(`OPENROUTER_API_KEY не задан. ${hint}`);
+  }
+
+  return apiKey;
+}
+
 function getOpenRouterUrl(): string {
   const baseUrl =
     process.env.OPENAI_BASE_URL?.replace(/\/$/, "") ??
@@ -26,18 +48,14 @@ function getOpenRouterUrl(): string {
 }
 
 export async function chatCompletion(messages: ChatMessage[]): Promise<string> {
-  const apiKey = process.env.OPENROUTER_API_KEY;
-
-  if (!apiKey) {
-    throw new Error("OPENROUTER_API_KEY не задан в .env.local");
-  }
+  const apiKey = getApiKey();
 
   const response = await fetch(getOpenRouterUrl(), {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
-      "HTTP-Referer": "http://localhost:3000",
+      "HTTP-Referer": getSiteUrl(),
       "X-Title": "Lexion",
     },
     body: JSON.stringify({
